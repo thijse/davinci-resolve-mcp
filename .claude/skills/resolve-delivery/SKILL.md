@@ -129,6 +129,13 @@ Two things that bite when hand-writing specs, both handled by the projections:
   blind. `deliverable`/`media` QC needs **ffmpeg + ffprobe on PATH** (GPL, not
   bundled) — call the advanced `capabilities` tool for live status + install hints.
 - Deliverable gates never auto-clear; surface the per-field verdict to a human.
+- For web delivery, prefer Resolve's own **YouTube** preset with an **mp4**
+  container (`prepare_render_job from_preset`) over hand-set H.264 values: it
+  gave smaller files at the same visible quality. A target outside the temp
+  directory needs `require_temp_target: false`. Check with
+  `verify_output expected_frames` (21.0.4.5 free).
+- `project_settings export_frame_as_still` returns False while a render runs and
+  briefly after; verify from the rendered file instead.
 
 ## Source-media safety (AGENTS.md)
 

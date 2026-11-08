@@ -9,6 +9,10 @@ clip contains or whether an assembly works without reading dozens of frames.
   sheet <video>        evenly spaced frames, or --at times, as one grid
   storyboard <cut>     one row per segment of a planned or assembled cut: in,
                        middle and last frame, lengths and running time
+  shake <video>        handheld jitter per window (px of high-frequency camera
+                       motion): which stretches need stabilizing
+  reframe <video>      where the action is, horizontally, per shot: the crop
+                       centre for a 9:16 (or --aspect) window out of wider footage
 
 Cut detection: ffmpeg's scene score with the same adaptive threshold
 `media_analysis` uses (mean + 2.5 sd, clamped to 0.15-0.40), or PySceneDetect's
@@ -283,6 +287,119 @@ def cmd_storyboard(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------- Motion: shake and reframe (need opencv + numpy) ----------
+
+
+def _cv():
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        raise SystemExit("shake and reframe need: pip install opencv-python-headless numpy")
+    return cv2, np
+
+
+def _gray_frames(path: str, start: float, end: float, fps: float, width: int):
+    """Display-oriented grey frames (ffmpeg applies the rotation flag)."""
+    _, np = _cv()
+    info = probe(path)
+    h = int(round(width * info["height"] / info["width"] / 2) * 2)
+    r = _run(["ffmpeg", "-v", "error", "-ss", "%.3f" % start, "-t", "%.3f" % (end - start), "-i", path, "-map", "0:v:0",
+              "-vf", "fps=%g,scale=%d:%d" % (fps, width, h), "-f", "rawvideo", "-pix_fmt", "gray", "-"])
+    return np.frombuffer(r.stdout, np.uint8).reshape(-1, h, width)
+
+
+def shake_px(path: str, start: float, end: float, width: int = 480) -> float:
+    """Mean residual of the camera path after a 9-frame moving average, in px at `width`.
+
+    Global motion per frame pair is a RANSAC similarity fit on tracked corners; the
+    smooth part is intended movement (a pan), the residual is the shake.
+    """
+    cv2, np = _cv()
+    g = _gray_frames(path, start, end, 24, width)
+    if len(g) < 10:
+        return 0.0
+    path_xy = [np.zeros(2)]
+    for a, b in zip(g, g[1:]):
+        pa = cv2.goodFeaturesToTrack(a, 200, 0.01, 8)
+        step = np.zeros(2)
+        if pa is not None and len(pa) > 8:
+            pb, st, _ = cv2.calcOpticalFlowPyrLK(a, b, pa, None)
+            ok = st.ravel() == 1
+            if ok.sum() > 8:
+                m, _ = cv2.estimateAffinePartial2D(pa[ok], pb[ok])
+                if m is not None:
+                    step = m[:, 2]
+        path_xy.append(path_xy[-1] + step)
+    p = np.array(path_xy)
+    k = 9
+    smooth = np.array([np.convolve(np.pad(p[:, i], k // 2, mode="edge"), np.ones(k) / k, "valid") for i in range(2)]).T
+    return float(np.sqrt(((p - smooth) ** 2).sum(1)).mean())
+
+
+def cmd_shake(args: argparse.Namespace) -> int:
+    info = probe(args.video)
+    end = info["duration"] if args.end is None else min(args.end, info["duration"])
+    rows, t = [], args.start
+    while t < end - 0.3:
+        w_end = min(end, t + args.window)
+        rows.append((t, w_end, shake_px(args.video, t, w_end)))
+        t = w_end
+    if args.json:
+        print(json.dumps([{"start": round(a, 3), "end": round(b, 3), "shake_px": round(s, 2)} for a, b, s in rows], indent=2))
+        return 0
+    print("| Start | End | Shake (px @480) | |\n| --- | --- | --- | --- |")
+    for a, b, s in rows:
+        print("| %s | %s | %.2f | %s |" % (fmt(a), fmt(b), s, "stabilize" if s >= args.limit else ""))
+    print("\nShake is the mean distance (px at 480 wide) between the camera path and its 9-frame moving average: "
+          "tripod ~0.1, steady hand ~0.5-1, walking 2-5, rough 5+. Rows at or over --limit %.1f are marked." % args.limit)
+    return 0
+
+
+def action_centre(path: str, start: float, end: float) -> float:
+    """Horizontal centre (0-1) of frame-to-frame change: where people and things move."""
+    cv2, np = _cv()
+    g = _gray_frames(path, start, end, 10, 480).astype(np.float32)
+    if len(g) < 2:
+        return 0.5
+    d = cv2.GaussianBlur(np.abs(np.diff(g, axis=0)).mean(0), (0, 0), 6)
+    col = d.sum(0)
+    col = np.clip(col - np.median(col), 0, None)
+    return float((col * np.arange(len(col))).sum() / col.sum() / len(col)) if col.sum() > 0 else 0.5
+
+
+def cmd_reframe(args: argparse.Namespace) -> int:
+    info = probe(args.video)
+    num, _, den = args.aspect.partition(":")
+    window = (info["height"] * float(num) / float(den)) / info["width"]
+    if window >= 1:
+        raise SystemExit("%s is not wider than %s: nothing to reframe" % (info["name"], args.aspect))
+    shots, _ = find_shots(args.video, args.detector, None, args.min_shot)
+    half = window / 2
+    out = []
+    for s in shots:
+        c = action_centre(args.video, s["start"], s["end"])
+        out.append({**s, "centre": round(min(max(c, half), 1 - half), 3), "raw_centre": round(c, 3)})
+    if args.json:
+        print(json.dumps({"file": os.path.abspath(args.video), "aspect": args.aspect, "window_fraction": round(window, 4), "shots": out}, indent=2))
+        return 0
+    tiles = []
+    for s in out[: args.max_tiles]:
+        img = frame_at(args.video, s["middle"], args.tile)
+        draw = ImageDraw.Draw(img)
+        x0, x1 = (s["centre"] - half) * img.width, (s["centre"] + half) * img.width
+        draw.rectangle((x0, 0, x1, img.height - 1), outline=(255, 200, 0), width=3)
+        tiles.append((img, "S%d %s centre %.2f" % (s["shot"], fmt(s["start"]), s["centre"])))
+    title = "%s  %s window = %.0f%% of width, yellow box per shot" % (info["name"], args.aspect, window * 100)
+    print("Wrote %s\n" % save(grid(tiles, min(args.cols, len(tiles)), title), args.out_dir, os.path.splitext(info["name"])[0] + "-reframe"))
+    print("| Shot | Start | End | Centre | Raw |\n| --- | --- | --- | --- | --- |")
+    for s in out:
+        print("| %d | %s | %s | %.3f | %.3f |" % (s["shot"], fmt(s["start"]), fmt(s["end"]), s["centre"], s["raw_centre"]))
+    print("\nCentre is where frame-to-frame change concentrates, clamped so the window stays inside the frame. "
+          "It finds movement, not faces: check the boxes, and for a two-shot interview pick each speaker by eye.")
+    return 0
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out-dir", default=os.path.join(os.getcwd(), "temp", "video-review"))
@@ -312,6 +429,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--per", type=int, default=3, help="frames per segment (1-5)")
     p.add_argument("--tile", type=int, default=240)
     p.set_defaults(func=cmd_storyboard)
+
+    p = sub.add_parser("shake", help="handheld jitter per window")
+    p.add_argument("video")
+    p.add_argument("--start", type=float, default=0.0)
+    p.add_argument("--end", type=float)
+    p.add_argument("--window", type=float, default=2.0, help="seconds per row")
+    p.add_argument("--limit", type=float, default=2.0, help="mark rows at or above this")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_shake)
+
+    p = sub.add_parser("reframe", help="crop centre per shot for a narrower aspect")
+    p.add_argument("video")
+    p.add_argument("--aspect", default="9:16", help="target aspect, w:h")
+    p.add_argument("--detector", choices=["ffmpeg", "pyscenedetect"], default="ffmpeg")
+    p.add_argument("--min-shot", type=float, default=0.4)
+    p.add_argument("--tile", type=int, default=320)
+    p.add_argument("--cols", type=int, default=4)
+    p.add_argument("--max-tiles", type=int, default=24)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_reframe)
 
     args = parser.parse_args(argv)
     return args.func(args)

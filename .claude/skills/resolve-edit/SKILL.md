@@ -94,6 +94,13 @@ absent on every build** — see the edit-kernel essentials below before you offe
   mirror / `include_audio`. For a full dead-air pass over **one long single-take
   recording** — transcribe → plan → review → execute, with the source/record
   coordinate trap spelled out — use the `resolve-tighten-recording` skill.
+- **Second round on a timeline the user edited:** never rebuild it. Diff first
+  (`scripts/timeline_diff.py "<timeline>" clip-infos.json` lists moved,
+  trimmed, deleted items and disabled tracks), then swap media under the edit
+  with `MediaPoolItem.ReplaceClip(path)` — a same-length replacement keeps every
+  item's position, trims, Pan and Fusion comp (21.0.4.5 free). The pool clip is
+  renamed to the new file, so match by `File Path` afterwards. Full flow in
+  `resolve-narrated-edit`.
 
 ## Show the gaps before cutting them (`edit_engine`)
 

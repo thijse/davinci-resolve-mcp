@@ -46,4 +46,16 @@ can use live UI; direct DB maintenance remains offline. See
    and input readability vary by Resolve/Fusion build; some inputs coerce or are
    write-only. Bulk mutation needs timeline scope, not the active Fusion page.
 
+## Over the in-app bridge (free edition)
+
+Measured on 21.0.4.5 free: tools and plain inputs work, but anything that needs
+`tool[input]` indexing fails with `'BridgeProxy' object is not subscriptable` —
+that is `add_keyframe`, expressions and modifiers. Work around it in Fusion's
+own Lua: create the tool from Python (`AddTool`), then `comp:Execute(lua)` with
+`tool.Size = BezierSpline({})` and `tool.Size[t] = v`. Do **not** call
+`comp:Lock()` around it (the call never returns). Key times are SOURCE frames:
+from `item.GetLeftOffset()` to `+ GetDuration() - 1`. `scripts/fusion_kenburns.py`
+does this for zoom/pan on stills; prove the result with an exported frame at the
+start and end of the item.
+
 Never modify/transcode/derive source media (AGENTS.md).

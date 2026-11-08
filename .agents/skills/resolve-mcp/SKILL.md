@@ -32,6 +32,7 @@ live. Node never drives Resolve.
 | Audio / Fairlight (tracks, buses, loudness) | `resolve-audio` | `audio-fairlight-kernel.md` | `/audio_workflow` |
 | Media pool ingest / organize / multicam | `resolve-media-pool` | `media-pool-ingest-kernel.md` | `/media_pool_workflow` |
 | Reading/analyzing source media | `resolve-media-analysis` | `media-analysis-guide.md` | `/analyze_media` |
+| Narrated short: voice-over + B-roll + music, exact length, portrait + landscape | `resolve-narrated-edit` | `timeline-edit-kernel.md` | `/timeline_edit_workflow` |
 
 ## Less-common domains (no dedicated skill — go straight to the kernel/tool)
 

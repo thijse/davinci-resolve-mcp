@@ -67,13 +67,16 @@ time, so a pointer stub would degrade skill routing. Edit either copy, then run
 Each canonical skill is a directory containing `SKILL.md`. The Claude adapter
 uses the same directory shape because Claude Code does not discover loose files.
 
-Two end-to-end assembly recipes sit alongside the domain skills. Where a domain
-skill routes, these two walk a whole job:
+Three end-to-end assembly recipes sit alongside the domain skills. Where a domain
+skill routes, these walk a whole job:
 
 - `resolve-rough-cut` — **additive**:
   select shots from a folder of many clips into an assembled timeline.
 - `resolve-tighten-recording`
   — **subtractive**: remove dead air from one long single-take recording.
+- `resolve-narrated-edit` — **narrated**: voice-over, interview, B-roll and
+  ducked music to an exact length, in portrait and landscape, with a
+  second-round flow for timelines the user has edited.
 
 Three more sit outside the domain routing:
 

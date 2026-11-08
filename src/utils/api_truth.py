@@ -4200,6 +4200,141 @@ API_TRUTH: List[Dict[str, Any]] = [
                     "DeleteKeyFrames(0.0) then -> [10, 20]; spline keyed before connect -> "
                     "[10, 20].",
     },
+    {
+        "symbol": "MediaPool.AppendToTimeline (still image ignores startFrame/endFrame)",
+        "object": "MediaPool",
+        "signature": "AppendToTimeline([{mediaPoolItem, startFrame, endFrame, recordFrame, trackIndex}])",
+        "reality": "A still image (a jpeg/png MediaPoolItem, reported 1 frame long) is "
+                   "always placed at the project's default still duration (120 frames "
+                   "at 24 fps here) whatever startFrame/endFrame say. Asking for 0-42 "
+                   "or 0-41 both returned a 120-frame item. Every following "
+                   "recordFrame-positioned clip on that track then lands on top of it.",
+        "recommended": "Bake each still to a short video clip at the timeline rate "
+                       "first (ffmpeg -loop 1 -framerate 24 -i img.jpg -t 8 ...), import "
+                       "that, and trim it with startFrame/endFrame like any clip. Check "
+                       "item durations after appending.",
+        "tags": ["timeline", "still", "silent-failure", "media-pool"],
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, portrait 1080x1920 24 fps timeline, jpeg stills.",
+    },
+    {
+        "symbol": "MediaPool.ImportMedia (numbered stills become an image sequence)",
+        "object": "MediaPool",
+        "signature": "ImportMedia([paths])",
+        "reality": "Importing files named like 'IMG (1).jpeg' ... 'IMG (5).jpeg' in "
+                   "one call yields ONE clip 'IMG ([1-5]).jpeg' of type Video, 5 "
+                   "frames long, instead of five stills. Phone exports (WhatsApp, "
+                   "camera bursts) hit this all the time.",
+        "recommended": "Copy or rename numbered stills to names without a running "
+                       "number before importing, or import them one call at a time; "
+                       "check the returned clip count against the paths sent.",
+        "tags": ["media-pool", "import", "still", "silent-failure"],
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, five WhatsApp jpegs '... 17.39.48 (1)..(5).jpeg'.",
+    },
+    {
+        "symbol": "TimelineItem.SetProperty Pan (scale-to-crop timeline)",
+        "object": "TimelineItem",
+        "signature": "SetProperty('Pan', value)",
+        "reality": "On a timeline with timelineInputResMismatchBehavior 'scaleToCrop', "
+                   "Pan is not in timeline pixels and not in the scale-to-fit units "
+                   "timeline_item set_transform pan_px assumes. Measured on a 1080x1920 "
+                   "timeline with an 848x480 source (fitted 3392 px wide): Pan +100 "
+                   "moved the picture 166 px LEFT, Pan +50 moved it 157 px (phase "
+                   "correlation on exported frames, so treat the scale as approximate "
+                   "and nonlinear near 0). Positive Pan moves the picture left, i.e. "
+                   "shows more of its right side. set_transform pan_px=576 pushed the "
+                   "subject out of frame.",
+        "recommended": "Calibrate per timeline: set Pan to two values, export the frame "
+                       "(project_settings export_frame_as_still) and measure the shift; "
+                       "then frame each subject by eye on exported stills. Do not trust "
+                       "pan_px on scale-to-crop timelines.",
+        "tags": ["timeline", "transform", "units", "reframe", "silent-failure"],
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, Pan 0/50/100/-100/170/-230/400 on one interview item, exported stills compared.",
+    },
+    {
+        "symbol": "TimelineItem.SetProperty DynamicZoomEnabled",
+        "object": "TimelineItem",
+        "signature": "SetProperty('DynamicZoomEnabled', True|1)",
+        "reality": "Returns False for True and for 1 on a placed video item, and the "
+                   "keyless GetProperty() dict carries no DynamicZoom key. Edit-page "
+                   "Inspector keyframes are also absent on this build "
+                   "(KEYFRAME_API_UNAVAILABLE), so a zoom/pan move over time cannot be "
+                   "authored on the Edit page from the API.",
+        "recommended": "Animate in Fusion instead: a Transform between MediaIn and "
+                       "MediaOut with Size/Center keyed through comp.Execute (Lua), "
+                       "see 'Fusion input keys over the in-app bridge'. "
+                       "scripts/fusion_kenburns.py does this.",
+        "tags": ["timeline", "transform", "missing-method", "keyframe"],
+        "submit": "missing",
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08.",
+    },
+    {
+        "symbol": "Fusion input keys over the in-app bridge (tool[input] indexing)",
+        "object": "Fusion Tool (bridge proxy)",
+        "signature": "tool[input][time] = value | comp.Execute(lua)",
+        "reality": "Over the in-app bridge (free edition), every route that indexes a "
+                   "Fusion input fails: fusion_comp add_keyframe and "
+                   "bulk_set_expressions return \"'BridgeProxy' object is not "
+                   "subscriptable\". set_input (SetInput) works but only sets a static "
+                   "value. comp.Execute(lua) runs inside Resolve where indexing works: "
+                   "t.Size = BezierSpline({}); t.Size[0] = 1.0; t.Size[41] = 1.12 "
+                   "rendered a measured 1.120x zoom between frames 0 and 41. Two "
+                   "conditions: (1) no c:Lock() around the writes - with it, the keys "
+                   "read back and the render stayed bit-identical (Composition.Lock "
+                   "entry); (2) create the Transform from Python with comp.AddTool "
+                   "first - AddTool inside Execute on a fresh comp returned nothing. "
+                   "Keys are in the item's SOURCE frames: GetLeftOffset() .. "
+                   "+GetDuration()-1, not 0-based record frames.",
+        "recommended": "On the bridge, author Fusion animation with comp.Execute(Lua), "
+                       "never wrapped in Lock, tool pre-created from Python, keys at "
+                       "GetLeftOffset()-based times. Prove it with two exported frames "
+                       "and a measured scale/offset. scripts/fusion_kenburns.py.",
+        "tags": ["fusion", "keyframe", "bridge", "free-edition", "silent-failure"],
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, 10 still clips on a portrait timeline; ORB affine fit on exported frames 0 and 41 gave scale 1.1201.",
+    },
+    {
+        "symbol": "TimelineItem.Stabilize (default mode warps)",
+        "object": "TimelineItem",
+        "signature": "Stabilize() -> Bool",
+        "reality": "Works through the API (returns True, ~0.5-18 s per item) but takes "
+                   "no options, so it runs the Color-page default (perspective/"
+                   "similarity with zoom). On handheld phone footage the user "
+                   "reported visible distortion. Its result lives in the item's grade: "
+                   "Graph.ResetAllGrades() removes it. GetProperty exposes no "
+                   "stabilizer setting to read or change.",
+        "recommended": "For a translation+scale-only result, bake it outside Resolve "
+                       "(scripts/stabilize_ts.py: per-shot smoothing, rotation dropped, "
+                       "fixed safety zoom) and swap the file under the items with "
+                       "MediaPoolItem.ReplaceClip; reset the grade of items that had "
+                       "Stabilize applied. Or ask the user to pick 'Translation' on "
+                       "the Color page Stabilizer.",
+        "tags": ["color", "stabilize", "missing-option"],
+        "submit": "missing",
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, 8 handheld items; shake residual 3.7 -> 2.6 px @480 with the bake.",
+    },
+    {
+        "symbol": "MediaPoolItem.ReplaceClip (non-destructive re-version under an edit)",
+        "object": "MediaPoolItem",
+        "signature": "ReplaceClip(filePath) -> Bool",
+        "reality": "Swaps the file under every timeline item using that pool clip and "
+                   "keeps each item's start, in/out, Pan/Zoom, Fusion comp and the "
+                   "user's later trims and moves, as long as the new file has the same "
+                   "frame count and rate. The pool clip's NAME changes to the new file "
+                   "name, so a lookup by the old name finds nothing afterwards.",
+        "recommended": "To apply a second round of fixes (new music mix, corrected "
+                       "title card, stabilized media) to a timeline the user has since "
+                       "edited, bake a same-length replacement and ReplaceClip it "
+                       "instead of rebuilding. Diff first (scripts/timeline_diff.py) and "
+                       "match items by file path after the swap, not by name.",
+        "tags": ["media-pool", "relink", "non-destructive", "edit"],
+        "verified_on": "DaVinci Resolve 21.0.4.5 (free, in-app bridge)",
+        "measured": "2026-11-08, music, two title-card movs and five video clips swapped under two user-edited timelines; diff before/after identical.",
+    },
 
 ]
 

@@ -100,5 +100,11 @@ can use live UI; direct DB maintenance remains offline. See
   (issue #128). Presets cover the repeatable-template case, never the
   content-adaptive one.
 
+- **Music ducking** has no API (no automation curves). Bake the bed instead:
+  `scripts/duck_music.py music.mp3 speech.json bed.wav --length 120` with the
+  speech intervals from the transcript. It holds the duck through pauses
+  shorter than `--hold` (1 s) — a fixed release made the music swell between
+  sentences — and eases attack/release. Place the bed on its own audio track.
+
 Never modify/transcode/derive source media (AGENTS.md) — the offline `audio` ops
 write NEW files to scratch, never over source.

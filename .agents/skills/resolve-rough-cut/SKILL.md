@@ -109,6 +109,9 @@ whose build is older than yours, and update the stamp when you do.
 | Phone footage is **VFR** | Studio 21.0 | `avg_frame_rate` differs per clip and from `r_frame_rate` | Match the timeline to what Resolve conforms to (its reported clip FPS), not to `r_frame_rate` |
 | `timelinePlaybackFrameRate` is read-only | Studio 21.0.2 | `set_setting` returns False for every value form, before and after a timeline exists | No API path. Ask the user to set it in Master Settings during setup (step 3), not at handover |
 | An API-built Fusion comp on a **media clip** renders **only when MediaOut has a path from MediaIn** | Studio 19.1.3.7, corrected 2026-08-02 | A comp wired `MediaIn → Blur → MediaOut` **does** render. But a `MediaOut` fed by a tool with **no source** does not merely get bypassed — the render job comes back `Failed`. The earlier blanket claim that such comps "never render" was too broad | Wire the graph so `MediaOut` descends from `MediaIn`, and never leave a tool unrooted. For text over picture, insert a Fusion **title** as its own timeline clip and set its `Text+` via `fusion_comp set_text_plus` |
+| Stills ignore `startFrame`/`endFrame` in `AppendToTimeline` | 21.0.4.5 free (bridge) | Every photo lands at the default still length (120 frames) and overlaps the next clip | Bake each still to a short clip at the timeline rate (`ffmpeg -loop 1 -framerate 24 -t 8`) and trim that like video |
+| Numbered photos import as an **image sequence** | 21.0.4.5 free (bridge) | `IMG (1..5).jpeg` arrive as one 5-frame `IMG ([1-5]).jpeg` clip | Copy to un-numbered names before import; compare the returned clip count to the paths sent |
+| `Pan` on a **scale-to-crop** timeline is not in pixels | 21.0.4.5 free (bridge) | Pan +100 moved the picture 166 px left (848x480 source, 1080x1920 timeline); `set_transform pan_px` pushed subjects out of frame | Calibrate with two exported frames, then frame by eye. For a vertical/landscape pair from one plan, see `resolve-narrated-edit` |
 
 The mixed-fps, audio-source-rate, `ImportMedia`, playback-frame-rate and Fusion
 rows are recorded in the `api_truth` ledger and
@@ -128,7 +131,13 @@ On burning text over picture specifically: the title route above renders, but
 the API cannot choose a destination track (issue #74 — `Insert*IntoTimeline`
 takes no `trackIndex` and always lands on V1), so overlaying text onto an
 existing clip's track is not reachable end-to-end. Treat text as a request for
-the user's UI pass, not something to attempt and half-deliver.
+the user's UI pass, not something to attempt and half-deliver. One route that
+does land on a chosen track (21.0.4.5 free, bridge): render the card as a
+ProRes 4444 `.mov` with alpha, sized to the measured text, import it, and place
+it with `append_to_timeline` `track_index` on a track above the picture.
+
+For a narrated piece (voice-over + B-roll + music to an exact length, portrait
+and landscape) use the `resolve-narrated-edit` skill.
 
 Destructive ops auto-archive the timeline, so several edits leave
 `*_archived_vNN` timelines behind. Clean them up before handing over.

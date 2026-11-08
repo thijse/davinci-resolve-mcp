@@ -12,7 +12,7 @@ that none exists).
 
 **Verified on:** DaVinci Resolve Studio 21.0.2
 
-**Totals:** 43 missing capabilities, 66 bugs / unreliable behaviors.
+**Totals:** 45 missing capabilities, 66 bugs / unreliable behaviors.
 
 The authoritative source is the runtime-queryable `api_truth` ledger
 (`resolve_control api_truth "<query>"`); this document is generated from
@@ -367,6 +367,22 @@ equivalent, blocking full automation.
 - **Behavior:** There is no call to slip an item's source range or trim its edges in place: no SetProperty key moves the source in-point and no Timeline method takes a new range. The only route is to delete the item and append the new range at the same record frame, which loses its grade, transform, crop and composite unless they are carried over by hand. With a source rate different from the timeline's, the appended length can come out a frame off (the AppendToTimeline mixed-fps floor) and needed a corrected endFrame and a second append.
 - **Workaround / current handling:** timeline replace_source_range: append the new range on a temporary track at the same record frame, CopyGrades onto it, carry transform/crop/composite/scaling, delete the original, append the final copy on the original track, CopyGrades from the temporary copy, re-apply the properties, delete the temporary copy, restore the track lock. Start, end and duration are verified exactly; an endFrame that lands a frame off is corrected and retried.
 - **Tags:** missing-method, timeline, edit, mixed-fps
+
+### TimelineItem.SetProperty DynamicZoomEnabled
+
+- **Object:** `TimelineItem`
+- **Signature:** `SetProperty('DynamicZoomEnabled', True|1)`
+- **Behavior:** Returns False for True and for 1 on a placed video item, and the keyless GetProperty() dict carries no DynamicZoom key. Edit-page Inspector keyframes are also absent on this build (KEYFRAME_API_UNAVAILABLE), so a zoom/pan move over time cannot be authored on the Edit page from the API.
+- **Workaround / current handling:** Animate in Fusion instead: a Transform between MediaIn and MediaOut with Size/Center keyed through comp.Execute (Lua), see 'Fusion input keys over the in-app bridge'. scripts/fusion_kenburns.py does this.
+- **Tags:** timeline, transform, missing-method, keyframe
+
+### TimelineItem.Stabilize (default mode warps)
+
+- **Object:** `TimelineItem`
+- **Signature:** `Stabilize() -> Bool`
+- **Behavior:** Works through the API (returns True, ~0.5-18 s per item) but takes no options, so it runs the Color-page default (perspective/similarity with zoom). On handheld phone footage the user reported visible distortion. Its result lives in the item's grade: Graph.ResetAllGrades() removes it. GetProperty exposes no stabilizer setting to read or change.
+- **Workaround / current handling:** For a translation+scale-only result, bake it outside Resolve (scripts/stabilize_ts.py: per-shot smoothing, rotation dropped, fixed safety zoom) and swap the file under the items with MediaPoolItem.ReplaceClip; reset the grade of items that had Stabilize applied. Or ask the user to pick 'Translation' on the Color page Stabilizer.
+- **Tags:** color, stabilize, missing-option
 
 ## Bugs / Unreliable Behavior (please fix)
 

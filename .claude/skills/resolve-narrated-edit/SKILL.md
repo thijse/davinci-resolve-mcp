@@ -1,11 +1,13 @@
 ---
 name: resolve-narrated-edit
-description: Building a narrated short video in the DaVinci Resolve MCP from a voice-over, an interview and B-roll — a school report, event recap, vlog or explainer cut to an exact length (2:00), with background music ducked under speech, photos with zoom/pan, title cards, and portrait and landscape versions. Apply when asked to edit a video around a recorded voice-over or script, fit narration to an exact duration, add music with ducking, make a 9:16 and a 16:9 version, reframe landscape footage for vertical, stabilize phone footage, or apply a second round of fixes to a timeline the user has already edited.
+description: Building a narrated short video in the DaVinci Resolve MCP from a voice-over, an interview and B-roll, starting from an understanding of the material (asset descriptions, timed voice-over, storyline) so pictures match what is being said — a school report, event recap, vlog or explainer cut to an exact length (2:00), with background music ducked under speech, photos with zoom/pan, title cards, and portrait and landscape versions. Apply when asked to edit a video around a recorded voice-over or script, fit narration to an exact duration, add music with ducking, make a 9:16 and a 16:9 version, reframe landscape footage for vertical, stabilize phone footage, or apply a second round of fixes to a timeline the user has already edited.
 ---
 
 # Resolve Narrated Edit
 Turns a recorded voice-over (plus interview, B-roll, photos and music) into
 **editable Resolve timelines** of an exact length, in portrait and landscape.
+It starts by understanding the film (what every asset shows, what every
+sentence says, what the story is); the mechanics below serve that.
 
 Measured end-to-end on DaVinci Resolve **21.0.4.5 free, through the in-app
 bridge**, 2026-11-08: a 2:00 school report (Dutch voice-over, a two-person
@@ -29,6 +31,48 @@ Rows marked with that build were measured there; re-confirm on another build
   quality than custom H.264 settings.
 - Exact length means exact: verify `GetEndFrame() - GetStartFrame()` and the
   rendered frame count (`render verify_output expected_frames`).
+
+## Understand the film before you cut it
+
+What made the edit work was not the API calls but knowing the material: what
+each asset shows, what the voice-over says sentence by sentence, and what story
+the piece tells. Build that understanding first, write it down as files the
+user can read and correct, and make every editing decision from it.
+
+- **The assignment and the script.** Read the brief (school assignment, client
+  brief) and the recording script. They give the structure (sections, intended
+  durations), the beat order, and often the intended picture per section
+  ("[Picture: the dolls, then the room]"). Keep the script's section ids; they
+  become the plan's ids.
+- **Every asset, described in words.** Look at every file, not just its name.
+  Contact sheets for videos (`video_review.py sheet`/`shots`), the photos
+  themselves, OCR (`video_ocr.py`) for signs, labels and wall texts that name
+  the work, the maker and the venue. Write one paragraph per asset (who and what
+  is in it, where, framing, motion, quality, usable moments with times) to an
+  `asset-descriptions.md`, in the user's language if they will review it. Mark
+  inferences as such; a WhatsApp filename tells you nothing. Ask the user about
+  what you cannot read (who is the designer, which room).
+- **The voice-over, timed.** Transcribe every speech source, then keep a timed
+  text (`timing.md`: `0:23.90–0:29.70 s2b <sentence>`) next to the plan. It
+  shows the user where each line lands and is what you match pictures against.
+  Whisper mishears names; correct them from the script, not the other way round.
+- **The storyline.** State in a few lines what the film is about and how it
+  moves (arrive → what caught my eye → the work → the maker in her words → my
+  opinion → reflection). Each section gets its key picture: the work being
+  discussed is shown while it is discussed, the maker is on screen when she
+  speaks, the narrator opens and closes.
+- **Match picture to sentence, not to section.** For each sentence, pick the
+  asset whose content says the same thing ("moss and peacock feathers" → the
+  close-up of the dress with feathers; "the snail" → the snail). Use the asset
+  descriptions to find candidates, then the usable moment within the clip.
+  Prefer variety: no clip twice in a row unless the story is about it.
+- **Check the cut against the story.** Storyboard the plan
+  (`video_review.py storyboard`), read it alongside the timed text, and fix
+  mismatches before building anything in Resolve. After a render, look again at
+  frames per sentence; "the picture shows the thing being said" is the test.
+
+Keep these files (brief, descriptions, timed text, plan) in the project folder:
+they are what the next round of edits, and the user, will work from.
 
 ## Workflow
 

@@ -71,6 +71,22 @@ Analysis informs Resolve actions. At no point do we create intermediate files th
   analysis. `image_qc_capabilities` reports numpy/ffmpeg availability and the
   cost tiers.
 
+## Seeing a clip or a cut in one image
+
+`scripts/video_review.py` answers "what is in this clip" and "does this cut work"
+with one labelled grid instead of many single-frame reads:
+
+- `shots <clip>` — cuts (the same adaptive scene threshold as analysis, or
+  `--detector pyscenedetect`) and one tile per shot; `--json` for the shot list.
+- `sheet <clip>` — evenly spaced frames, or `--at` times.
+- `storyboard <cut.json>` — one row per segment (in, middle, last frame) of an
+  edit plan or of timeline items as `timeline_item` reports them
+  (`file_path`, `source_start`/`source_end` exclusive, `source_fps`). Check an
+  assembly before rendering it.
+
+For the vision payload of an analysis run, `scripts/contact_sheet.py` tiles the
+frames `analyze_*` already extracted.
+
 ## Setup
 
 On first use, ask the user the three setup questions documented in the guide:

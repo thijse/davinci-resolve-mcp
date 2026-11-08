@@ -94,6 +94,29 @@ semantics.
   parity audit and re-anchor those comments in the same change, or leave the
   file at its 21.0 revision and cite the `.pyi` for new work
 
+## Scripting Your Own Analysis
+
+The tools do not cover every question. When they don't, write a small script
+(Python with ffmpeg/ffprobe, in session scratch space) rather than guessing from
+a few frames: counting, timing, finding when or where something happens, and
+comparing are cheaper and more reliable as code than as image reads. Keep the
+source-media rules above: read sources, write only to scratch or analysis roots.
+
+Before ending the task, ask whether the script would help the next session.
+If it is general (any footage, any project), promote it instead of leaving it
+in scratch:
+
+- a measurement or view: a subcommand or option of `scripts/video_review.py`
+  (shots, sheet, storyboard) or a new `scripts/*.py` with a module docstring
+  that says what it answers and how to run it;
+- something an MCP tool should do for every client: an action in the matching
+  compound tool, behind the existing dispatch pattern;
+- in both cases a focused test under `tests/` that runs without Resolve, and a
+  line in the matching skill or guide so the next agent knows it exists.
+
+Keep one-off, project-specific processing out. Say in your report what you
+promoted, or why you didn't.
+
 ## Key Paths
 
 - Compound server: `src/server.py`
@@ -120,6 +143,8 @@ venv/bin/python -m src.control_panel
 python install.py
 venv/bin/python tests/test_import.py
 venv/bin/python scripts/audit_api_parity.py
+python scripts/video_review.py shots <clip>        # cuts + one tile per shot
+python scripts/video_review.py storyboard <cut.json>  # a cut as one row per segment
 ```
 
 Python 3.10+ is required (the MCP SDK floor). 3.10-3.12 is the lowest-risk range

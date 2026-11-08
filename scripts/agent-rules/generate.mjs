@@ -129,6 +129,7 @@ const repoHygiene = [
   `- Canonical agent brief: AGENTS.md. Operating reference: docs/SKILL.md. Per-action depth: docs/kernels/*. Advanced (offline) catalog: resolve-advanced/README.md.`,
   `- Never modify, transcode, convert, proxy, relink, or create derivatives of source media unless explicitly asked. Analysis output goes to sidecars/scratch/the analysis project root.`,
   `- Do not duplicate version numbers, tool counts, or kernel-action counts into prose — they drift. Reference the docs above.`,
+  `- Write small scripts for analysis the tools don't cover (measure, don't eyeball); when one would help the next session, promote it into scripts/ or a tool action with a test. See AGENTS.md "Scripting Your Own Analysis".`,
 ].join('\n');
 
 // ── Emit helpers ───────────────────────────────────────────────────────────────

@@ -97,8 +97,9 @@ they are what the next round of edits, and the user, will work from.
    `still`, or `sync` (picture follows a speech unit — the narrator on camera,
    the interview two-shot). Put the narrator on camera at the start, the end,
    and briefly between sections; B-roll everywhere else, chosen per sentence.
-   Split `sync` segments at speech-unit boundaries (jump cuts) but merge pieces
-   shorter than ~0.4 s into the neighbour — a 2-frame flash is a bug.
+   Split `sync` segments at speech-unit boundaries but merge pieces shorter
+   than ~0.4 s into the neighbour — a 2-frame flash is a bug. Every cut
+   inside one talking-head take is a **jump cut**: handle it (next section).
 6. **Interview sync.** If picture and sound are separate files, find the offset
    by cross-correlating loudness envelopes (10 ms RMS, band-passed). If the user
    then nudges the audio on the timeline, read the item positions back and use
@@ -121,6 +122,31 @@ they are what the next round of edits, and the user, will work from.
     export_frame_as_still`) at the title card, a reframed shot and a still
     (start vs end), and a contact sheet of the render (`video_review.py sheet`).
 
+## Jump cuts in talking heads
+
+Cutting pauses or sentences out of one take of a face leaves small jumps: the
+head shifts a few pixels, the expression snaps. Small jumps on a face look like
+errors (user feedback on the 2026-11-08 edit, where the narrator and interview
+shots kept them). For every cut inside the same take, in this order:
+
+1. **Cover it with B-roll.** Keep the audio continuous and lay a B-roll shot
+   over the cut on the track above, starting a little before and ending a
+   little after it (≥ 1.5 s). Choose B-roll that matches what is being said;
+   this is the standard fix and usually the best one.
+2. **Switch to another angle.** If a second camera or a different framing of
+   the same moment exists (the interview recorded from two phones, a wide and a
+   close shot), cut to it at the join.
+3. **Make the jump deliberate.** If neither exists, change the framing enough
+   that it reads as a new shot: a clearly different zoom (≥ 15–20 %) and/or
+   position on the side after the cut (punch-in). Alternate between two framings
+   across successive cuts. A 2–5 % change looks like a mistake; a big one
+   looks intentional.
+
+Find them before building: list every pair of adjacent `sync` items from the
+same source (`timeline_diff.py`/the plan), and check each with an exported
+frame either side of the cut. Cuts *between* different shots or sources need
+none of this.
+
 ## Portrait (9:16) and landscape (16:9) from one plan
 
 Keep one plan; derive both timelines from it.
@@ -132,7 +158,8 @@ Keep one plan; derive both timelines from it.
   speaks (split items at turn changes). Pan units on scale-to-crop are not
   pixels (see traps) — calibrate once per timeline.
 - **Landscape with portrait sources:** `scaleToFit`, and a **blurred fill** of
-  the same shot on the track below: bake per source with
+  the same shot on the track below (the user liked this better than black bars
+  or a crop that loses the subject): bake per source with
   `scale=960:540:force_original_aspect_ratio=increase,crop=960:540,boxblur=20:3,eq=brightness=-0.08`
   (half resolution is plenty under a heavy blur). Same record/source frames as
   the sharp clip so they stay in step. Native 16:9 shots get no background.
